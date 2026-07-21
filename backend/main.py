@@ -7,7 +7,7 @@ from sqlalchemy import inspect, text
 # Create Tables
 Base.metadata.create_all(bind=engine)
 
-# Auto-migrate SQLite missing columns if table already exists
+# Auto-migrate SQLite missing columns & populate department for existing records
 with engine.connect() as conn:
     inspector = inspect(engine)
     if "reports" in inspector.get_table_names():
@@ -22,6 +22,13 @@ with engine.connect() as conn:
             conn.execute(text("ALTER TABLE reports ADD COLUMN resolution_notes TEXT"))
         if "resolved_at" not in existing_cols:
             conn.execute(text("ALTER TABLE reports ADD COLUMN resolved_at DATETIME"))
+        
+        # Backfill existing reports (#1 to #6) based on issue type
+        conn.execute(text("UPDATE reports SET department = 'PWD / Roads Department' WHERE LOWER(type) LIKE '%pothole%' OR LOWER(title) LIKE '%pothole%'"))
+        conn.execute(text("UPDATE reports SET department = 'Electricity & Lighting Board' WHERE LOWER(type) LIKE '%streetlight%' OR LOWER(title) LIKE '%streetlight%' OR LOWER(title) LIKE '%strretlight%'"))
+        conn.execute(text("UPDATE reports SET department = 'Sanitation & Waste Management' WHERE LOWER(type) LIKE '%garbage%' OR LOWER(title) LIKE '%garbage%'"))
+        conn.execute(text("UPDATE reports SET department = 'Water Supply & Sewerage Board' WHERE LOWER(type) LIKE '%water%' OR LOWER(title) LIKE '%water%'"))
+        conn.execute(text("UPDATE reports SET department = 'Traffic & Transit Authority' WHERE LOWER(type) LIKE '%traffic%' OR LOWER(title) LIKE '%traffic%'"))
         conn.commit()
 
 app = FastAPI(

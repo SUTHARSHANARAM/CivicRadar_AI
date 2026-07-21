@@ -11,15 +11,21 @@ from realtime.socket_manager import manager
 
 router = APIRouter()
 
-# Department Routing Mapping
-DEPARTMENT_MAPPING = {
-    "Pothole": "PWD / Roads Department",
-    "Streetlight": "Electricity & Lighting Board",
-    "Garbage": "Sanitation & Waste Management",
-    "Traffic Signal": "Traffic & Transit Authority",
-    "Water Leak": "Water Supply & Sewerage Board",
-    "Other": "General Municipal Works"
-}
+def resolve_department(category: str, title: str = "") -> str:
+    cat_lower = (category or "").lower()
+    title_lower = (title or "").lower()
+    
+    if "pothole" in cat_lower or "pothole" in title_lower or "road" in title_lower:
+        return "PWD / Roads Department"
+    elif "light" in cat_lower or "light" in title_lower or "strretlight" in title_lower:
+        return "Electricity & Lighting Board"
+    elif "garbage" in cat_lower or "garbage text" in title_lower or "waste" in cat_lower:
+        return "Sanitation & Waste Management"
+    elif "water" in cat_lower or "leak" in cat_lower or "sewer" in cat_lower:
+        return "Water Supply & Sewerage Board"
+    elif "traffic" in cat_lower or "signal" in cat_lower:
+        return "Traffic & Transit Authority"
+    return "General Municipal Works"
 
 # --- Pydantic Schemas ---
 class ReportCreate(BaseModel):
@@ -55,15 +61,10 @@ class ReportUpdate(BaseModel):
 
 @router.post("/reports", response_model=ReportResponse)
 async def create_report(report_in: ReportCreate, db: Session = Depends(get_db)):
-    """
-    Submit a new issue report.
-    Automatically assigns Department & runs AI Urgency Classification.
-    """
     ai_result = priority_service.predict(report_in.description)
     urgency = ai_result.get("urgency", "Pending")
     
-    # Auto Department Routing
-    assigned_dept = DEPARTMENT_MAPPING.get(report_in.type, "General Municipal Works")
+    assigned_dept = resolve_department(report_in.type, report_in.title)
     
     new_report = Report(
         title=report_in.title,
@@ -82,7 +83,6 @@ async def create_report(report_in: ReportCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_report)
     
-    # Broadcast Real-time Event
     await manager.broadcast({
         "type": "NEW_REPORT",
         "data": {
@@ -104,9 +104,6 @@ async def create_report(report_in: ReportCreate, db: Session = Depends(get_db)):
 
 @router.get("/reports", response_model=List[ReportResponse])
 def get_reports(department: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    """
-    Fetch all reports with optional Department filtering.
-    """
     query = db.query(Report)
     if department and department != "All":
         query = query.filter(Report.department == department)
@@ -134,9 +131,6 @@ def get_stats(db: Session = Depends(get_db)):
 
 @router.put("/reports/{report_id}", response_model=ReportResponse)
 async def update_report(report_id: int, update_data: ReportUpdate, db: Session = Depends(get_db)):
-    """
-    Update report status, urgency, department, or submit resolution proof.
-    """
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -161,7 +155,6 @@ async def update_report(report_id: int, update_data: ReportUpdate, db: Session =
     db.commit()
     db.refresh(report)
     
-    # Broadcast update
     await manager.broadcast({
         "type": "UPDATE_REPORT",
         "data": {
