@@ -100,17 +100,17 @@ const Home = () => {
         fetchReports();
     };
 
+    // 100% REAL LIVE STATISTICS FROM DATABASE
     const resolvedCount = reports.filter(r => r.status === 'Resolved').length;
     const activeCount = reports.filter(r => r.status !== 'Resolved').length;
-    const totalCitizens = reports.reduce((acc, r) => acc + (r.upvotes || 0), 0) + 142; // Dynamic citizens active count
+    const totalCitizensSupporting = reports.reduce((acc, r) => acc + (r.upvotes || 0), 0) + reports.length;
 
     const isResolved = selectedReport?.status === 'Resolved';
 
-    // AI Reason Generator for transparency
     const getAiReason = (report) => {
         if (!report) return "";
         if (report.urgency_level === 'High') {
-            return "NLP classification & keyword analysis detected critical public safety risks, high traffic impact, or an upvote escalation surge.";
+            return "NLP classification & keyword analysis detected critical public safety risks, heavy traffic impact, or an upvote escalation surge.";
         }
         if (report.urgency_level === 'Medium') {
             return "Moderate severity issue detected. Escalation pending based on community upvotes or department queue.";
@@ -157,7 +157,7 @@ const Home = () => {
                 </div>
             </header>
 
-            {/* HERO BANNER & LANDING STATISTICS */}
+            {/* HERO BANNER & REAL LIVE STATISTICS */}
             {showHeroBanner && (
                 <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white px-4 py-3 sm:px-6 sm:py-4 relative z-10 shrink-0 border-b border-blue-800/50 animate-fade-in shadow-md">
                     <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
@@ -171,7 +171,7 @@ const Home = () => {
                             </p>
                         </div>
 
-                        {/* Landing Stats Bar */}
+                        {/* Real Live Statistics Bar */}
                         <div className="flex items-center gap-4 sm:gap-6 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 self-stretch md:self-auto justify-around">
                             <div className="text-center">
                                 <span className="text-[10px] text-green-300 font-bold uppercase block">Resolved</span>
@@ -184,8 +184,8 @@ const Home = () => {
                             </div>
                             <div className="h-6 w-px bg-white/20" />
                             <div className="text-center">
-                                <span className="text-[10px] text-blue-300 font-bold uppercase block">Citizens</span>
-                                <span className="text-sm sm:text-base font-extrabold text-blue-300">👥 {totalCitizens}</span>
+                                <span className="text-[10px] text-blue-300 font-bold uppercase block">Community Support</span>
+                                <span className="text-sm sm:text-base font-extrabold text-blue-300">👥 {totalCitizensSupporting}</span>
                             </div>
                         </div>
                     </div>
