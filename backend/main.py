@@ -1,13 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import reports, realtime
-from database import engine, Base
+from database import engine, Base, SessionLocal
+from models.report import Report
 from sqlalchemy import inspect, text
 
 # Create Tables
 Base.metadata.create_all(bind=engine)
 
-# Auto-migrate SQLite missing columns & populate department for existing records
+# Auto-migrate SQLite missing columns
 with engine.connect() as conn:
     inspector = inspect(engine)
     if "reports" in inspector.get_table_names():
@@ -22,14 +23,73 @@ with engine.connect() as conn:
             conn.execute(text("ALTER TABLE reports ADD COLUMN resolution_notes TEXT"))
         if "resolved_at" not in existing_cols:
             conn.execute(text("ALTER TABLE reports ADD COLUMN resolved_at DATETIME"))
-        
-        # Backfill existing reports (#1 to #6) based on issue type
-        conn.execute(text("UPDATE reports SET department = 'PWD / Roads Department' WHERE LOWER(type) LIKE '%pothole%' OR LOWER(title) LIKE '%pothole%'"))
-        conn.execute(text("UPDATE reports SET department = 'Electricity & Lighting Board' WHERE LOWER(type) LIKE '%streetlight%' OR LOWER(title) LIKE '%streetlight%' OR LOWER(title) LIKE '%strretlight%'"))
-        conn.execute(text("UPDATE reports SET department = 'Sanitation & Waste Management' WHERE LOWER(type) LIKE '%garbage%' OR LOWER(title) LIKE '%garbage%'"))
-        conn.execute(text("UPDATE reports SET department = 'Water Supply & Sewerage Board' WHERE LOWER(type) LIKE '%water%' OR LOWER(title) LIKE '%water%'"))
-        conn.execute(text("UPDATE reports SET department = 'Traffic & Transit Authority' WHERE LOWER(type) LIKE '%traffic%' OR LOWER(title) LIKE '%traffic%'"))
         conn.commit()
+
+# Seed initial sample data if database is empty (for live cloud deployment demo)
+db = SessionLocal()
+try:
+    if db.query(Report).count() == 0:
+        sample_reports = [
+            Report(
+                title="Deep Pothole near Main Market",
+                description="Large dangerous pothole on the main road causing severe traffic slowdowns and vehicle damage.",
+                type="Pothole",
+                department="PWD / Roads Department",
+                latitude=28.6139,
+                longitude=77.2090,
+                urgency_level="High",
+                status="Reported",
+                upvotes=12
+            ),
+            Report(
+                title="Broken Streetlight at Block B",
+                description="Streetlight flickering and completely dark at night creating unsafe conditions for pedestrians.",
+                type="Streetlight",
+                department="Electricity & Lighting Board",
+                latitude=28.6145,
+                longitude=77.2095,
+                urgency_level="Medium",
+                status="Reported",
+                upvotes=5
+            ),
+            Report(
+                title="Garbage Overflow near Bus Stop",
+                description="Uncollected municipal waste dumping area spilling onto sidewalk causing foul odor and health risk.",
+                type="Garbage",
+                department="Sanitation & Waste Management",
+                latitude=28.6150,
+                longitude=77.2100,
+                urgency_level="High",
+                status="Reported",
+                upvotes=8
+            ),
+            Report(
+                title="Main Water Pipeline Burst",
+                description="High pressure clean water leaking heavily onto road near residential junction.",
+                type="Water Leak",
+                department="Water Supply & Sewerage Board",
+                latitude=28.6130,
+                longitude=77.2080,
+                urgency_level="High",
+                status="Reported",
+                upvotes=15
+            ),
+            Report(
+                title="Traffic Signal Red Light Stuck",
+                description="Traffic signal stuck on red causing confusion and bottleneck at 4-way intersection.",
+                type="Traffic Signal",
+                department="Traffic & Transit Authority",
+                latitude=28.6125,
+                longitude=77.2075,
+                urgency_level="High",
+                status="Reported",
+                upvotes=9
+            ),
+        ]
+        db.add_all(sample_reports)
+        db.commit()
+finally:
+    db.close()
 
 app = FastAPI(
     title="City Problem Radar API",
@@ -37,11 +97,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-origins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:3000",
-]
+origins = ["*"]  # Allow all origins for production cloud deployment
 
 app.add_middleware(
     CORSMiddleware,
