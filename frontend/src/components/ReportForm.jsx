@@ -4,6 +4,7 @@ import { X, Camera, MapPin, Loader, Upload } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { API_URL } from '../utils/config';
 
 // Fix Leaflet marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -150,7 +151,7 @@ const ReportForm = ({ onClose, onSuccess }) => {
                 image_url: formData.imageUrlStr || null
             };
 
-            const response = await axios.post('http://127.0.0.1:8000/api/reports', payload);
+            const response = await axios.post(`${API_URL}/api/reports`, payload);
             console.log("Success:", response.data);
             onSuccess(response.data);
             onClose();

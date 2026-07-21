@@ -5,6 +5,7 @@ import ReportForm from '../components/ReportForm';
 import axios from 'axios';
 import { socketService } from '../sockets/socket';
 import { ThumbsUp, Sparkles, CheckCircle2, Clock, MapPin, X, Menu } from 'lucide-react';
+import { API_URL } from '../utils/config';
 
 const Home = () => {
     const [showReportForm, setShowReportForm] = useState(false);
@@ -29,7 +30,7 @@ const Home = () => {
 
     const fetchReports = async () => {
         try {
-            const res = await axios.get('http://127.0.0.1:8000/api/reports');
+            const res = await axios.get(`${API_URL}/api/reports`);
             setReports(res.data);
         } catch (err) {
             console.error("Error fetching reports:", err);
@@ -39,7 +40,7 @@ const Home = () => {
     const toggleHotspots = async () => {
         if (!showHotspots && hotspots.length === 0) {
             try {
-                const res = await axios.get('http://127.0.0.1:8000/api/hotspots');
+                const res = await axios.get(`${API_URL}/api/hotspots`);
                 setHotspots(res.data);
                 if (res.data.length === 0) alert("Need more reports to predict hotspots!");
             } catch (err) {
@@ -54,7 +55,7 @@ const Home = () => {
         if (upvotedIds.includes(reportId)) return;
 
         try {
-            const res = await axios.post(`http://127.0.0.1:8000/api/reports/${reportId}/upvote`);
+            const res = await axios.post(`${API_URL}/api/reports/${reportId}/upvote`);
             const { upvotes, urgency_level } = res.data;
 
             setReports(prev => prev.map(r => r.id === reportId ? { ...r, upvotes, urgency_level } : r));
@@ -148,10 +149,9 @@ const Home = () => {
                 />
             )}
 
-            {/* Citizen Issue Detail Drawer / Panel (Fully Responsive: Bottom sheet on Mobile, Side Drawer on Desktop) */}
+            {/* Citizen Issue Detail Drawer */}
             {selectedReport && (
                 <div className="fixed inset-0 z-[2000] flex justify-end items-end sm:items-stretch">
-                    {/* Backdrop */}
                     <div 
                         className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity" 
                         onClick={() => setSelectedReport(null)} 

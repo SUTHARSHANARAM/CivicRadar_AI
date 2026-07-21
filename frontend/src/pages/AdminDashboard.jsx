@@ -5,6 +5,7 @@ import {
     LayoutDashboard, CheckCircle, AlertOctagon, Activity, Map, X, MapPin, 
     Clock, Tag, FileText, Camera, Upload, Download, Check, Sparkles, Building2, Filter
 } from 'lucide-react';
+import { API_URL } from '../utils/config';
 
 const DEPARTMENTS = [
     "All",
@@ -71,7 +72,7 @@ const ResolveModal = ({ report, onClose, onSuccess }) => {
         e.preventDefault();
         setSubmitting(true);
         try {
-            await axios.put(`http://127.0.0.1:8000/api/reports/${report.id}`, {
+            await axios.put(`${API_URL}/api/reports/${report.id}`, {
                 status: 'Resolved',
                 resolution_image_url: imageUrl || null,
                 resolution_notes: notes.trim() || 'Issue repaired by municipal maintenance team.'
@@ -353,8 +354,8 @@ const AdminDashboard = () => {
     const fetchData = async () => {
         try {
             const [statsRes, reportsRes] = await Promise.all([
-                axios.get('http://127.0.0.1:8000/api/stats'),
-                axios.get(`http://127.0.0.1:8000/api/reports${selectedDept !== 'All' ? `?department=${encodeURIComponent(selectedDept)}` : ''}`)
+                axios.get(`${API_URL}/api/stats`),
+                axios.get(`${API_URL}/api/reports${selectedDept !== 'All' ? `?department=${encodeURIComponent(selectedDept)}` : ''}`)
             ]);
             setStats(statsRes.data);
             setReports(reportsRes.data);
