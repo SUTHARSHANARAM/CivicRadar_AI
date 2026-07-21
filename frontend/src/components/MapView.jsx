@@ -3,15 +3,11 @@ import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, useMapEvents } 
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Assets & Icons
+// Fix Leaflet marker icon URL resolution
 delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
 
-const reportIcon = new L.Icon({
+// Custom Marker Colors
+const highIcon = new L.Icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
     iconSize: [25, 41],
@@ -19,6 +15,40 @@ const reportIcon = new L.Icon({
     popupAnchor: [1, -34],
     shadowSize: [41, 41]
 });
+
+const mediumIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-gold.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
+
+const lowIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
+
+const resolvedIcon = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
+
+const getReportMarkerIcon = (report) => {
+    if (report.status === 'Resolved') return resolvedIcon;
+    if (report.urgency_level === 'High') return highIcon;
+    if (report.urgency_level === 'Medium') return mediumIcon;
+    return lowIcon;
+};
 
 // Map Controller: Handles Flying to locations
 const MapController = ({ centerLocation }) => {
@@ -53,9 +83,11 @@ const MapView = ({ reports = [], hotspots = [], onReportClick }) => {
     const [centerCoords, setCenterCoords] = useState(null);
     const [isResolving, setIsResolving] = useState(false);
     
-    // UI States
+    // UI Search & Autocomplete States
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const searchTimeoutRef = useRef(null);
 
     // Geolocation Logic
     const handleLocateMe = () => {
@@ -90,15 +122,30 @@ const MapView = ({ reports = [], hotspots = [], onReportClick }) => {
         }
     };
 
-    // Search Logic
-    const handleSearch = async (e) => {
-        e.preventDefault();
-        if (!searchQuery) return;
-        try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`);
-            const data = await res.json();
-            if (data && data.length > 0) setSearchResults(data);
-        } catch (error) {}
+    // Autocomplete Search Logic
+    const handleSearchInput = (e) => {
+        const value = e.target.value;
+        setSearchQuery(value);
+
+        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+        if (!value.trim()) {
+            setSearchResults([]);
+            return;
+        }
+
+        searchTimeoutRef.current = setTimeout(async () => {
+            setIsSearching(true);
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(value)}&limit=5`);
+                const data = await res.json();
+                setSearchResults(data || []);
+            } catch (error) {
+                console.error("Search error:", error);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 400);
     };
 
     const selectSearchResult = (result) => {
@@ -112,37 +159,42 @@ const MapView = ({ reports = [], hotspots = [], onReportClick }) => {
     return (
         <div className="relative w-full h-full rounded-none sm:rounded-xl overflow-hidden border-0 sm:border border-gray-300 shadow-md flex flex-col">
             
-            {/* TOP BAR: Search & Geolocation */}
+            {/* TOP BAR: Search Autocomplete & Geolocation */}
             <div className="absolute top-3 left-3 right-14 sm:top-4 sm:left-4 sm:right-16 z-[1000] flex gap-2">
-                <form onSubmit={handleSearch} className="flex-1 flex bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+                <div className="flex-1 flex bg-white/95 backdrop-blur-md rounded-xl shadow-lg overflow-hidden border border-gray-200">
                     <input 
-                        className="flex-1 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm outline-none" 
-                        placeholder="Search area or street..." 
+                        className="flex-1 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm outline-none bg-transparent" 
+                        placeholder="🔍 Type city, street or landmark..." 
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={handleSearchInput}
                     />
-                    <button type="submit" className="px-3 sm:px-4 bg-slate-100 border-l hover:bg-slate-200 text-xs sm:text-sm">🔍</button>
-                </form>
+                    {isSearching && (
+                        <div className="flex items-center pr-3">
+                            <div className="animate-spin h-3.5 w-3.5 border-2 border-blue-600 border-t-transparent rounded-full" />
+                        </div>
+                    )}
+                </div>
             </div>
 
             <button 
                 onClick={handleLocateMe}
-                className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[1000] bg-white p-2.5 sm:p-3 rounded-xl shadow-lg border border-gray-200 hover:bg-gray-50 text-blue-600 font-bold text-sm"
+                className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[1000] bg-white/95 backdrop-blur-md p-2.5 sm:p-3 rounded-xl shadow-lg border border-gray-200 hover:bg-blue-50 text-blue-600 font-bold text-sm transition transform hover:scale-105"
                 title="Locate Me"
             >
                 📍
             </button>
 
-            {/* Search Dropdown */}
+            {/* Autocomplete Dropdown */}
             {searchResults.length > 0 && (
-                <div className="absolute top-14 left-3 right-3 sm:top-16 sm:left-4 sm:right-4 z-[1001] bg-white rounded-xl shadow-xl max-h-48 overflow-y-auto border border-gray-100">
+                <div className="absolute top-14 left-3 right-3 sm:top-16 sm:left-4 sm:right-4 z-[1001] bg-white rounded-xl shadow-2xl max-h-56 overflow-y-auto border border-gray-100 divide-y divide-gray-100 animate-fade-in">
                     {searchResults.map((item) => (
                         <div 
                             key={item.place_id}
-                            className="px-3 py-2.5 text-xs border-b last:border-0 hover:bg-blue-50 cursor-pointer text-gray-700"
+                            className="px-4 py-3 text-xs hover:bg-blue-50 cursor-pointer text-gray-700 font-medium flex items-center gap-2 transition"
                             onClick={() => selectSearchResult(item)}
                         >
-                            {item.display_name}
+                            <span>📍</span>
+                            <span className="truncate">{item.display_name}</span>
                         </div>
                     ))}
                 </div>
@@ -164,38 +216,43 @@ const MapView = ({ reports = [], hotspots = [], onReportClick }) => {
                     <MapController centerLocation={mapCenter} />
                     <CenterTracker onCenterChange={handleCenterChange} />
 
-                    {/* Report Markers */}
+                    {/* Color-Coded Report Markers */}
                     {reports.map((report) => (
                         <Marker 
                             key={report.id} 
                             position={[report.latitude, report.longitude]}
-                            icon={reportIcon}
+                            icon={getReportMarkerIcon(report)}
                             eventHandlers={{ click: () => onReportClick && onReportClick(report) }}
                         >
                             <Popup>
-                                <div className="min-w-[150px]">
+                                <div className="min-w-[170px] p-1">
                                     <strong className="block text-sm mb-1">{report.title}</strong>
-                                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded text-white ${
-                                        report.urgency_level === 'High' ? 'bg-red-500' :
-                                        report.urgency_level === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'
-                                    }`}>{report.urgency_level} Priority</span>
-                                    <p className="text-xs text-gray-500 mt-1 capitalize">{report.type}</p>
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded text-white ${
+                                            report.status === 'Resolved' ? 'bg-green-600' :
+                                            report.urgency_level === 'High' ? 'bg-red-600' :
+                                            report.urgency_level === 'Medium' ? 'bg-orange-500' : 'bg-blue-600'
+                                        }`}>
+                                            {report.status === 'Resolved' ? 'Resolved ✓' : `${report.urgency_level} Priority`}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 capitalize mb-1">🏢 {report.department || report.type}</p>
                                     <button
                                         onClick={() => onReportClick && onReportClick(report)}
-                                        className="mt-2 w-full text-xs bg-blue-600 text-white py-1 px-2 rounded-lg hover:bg-blue-700 font-bold"
+                                        className="mt-1 w-full text-xs bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded-lg font-bold transition"
                                     >View Details →</button>
                                 </div>
                             </Popup>
                         </Marker>
                     ))}
 
-                    {/* Hotspot Zones */}
+                    {/* Hotspot Risk Zones */}
                     {hotspots.map((zone, idx) => (
                         <Circle
                             key={idx}
                             center={[zone.latitude, zone.longitude]}
                             radius={zone.radius}
-                            pathOptions={{ color: 'red', fillColor: 'red', fillOpacity: 0.3, weight: 1 }}
+                            pathOptions={{ color: 'red', fillColor: 'red', fillOpacity: 0.3, weight: 1.5 }}
                         />
                     ))}
                 </MapContainer>
@@ -205,9 +262,9 @@ const MapView = ({ reports = [], hotspots = [], onReportClick }) => {
                     <img 
                         src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png" 
                         alt="Center Pin" 
-                        className="h-9 w-5 sm:h-10 sm:w-6 drop-shadow-xl"
+                        className="h-9 w-5 sm:h-10 sm:w-6 drop-shadow-2xl animate-bounce-short"
                     />
-                    <div className="w-2 h-1 bg-black/30 rounded-full mx-auto mt-[-2px] blur-[1px]"></div>
+                    <div className="w-2.5 h-1 bg-black/40 rounded-full mx-auto mt-[-2px] blur-[1px]"></div>
                 </div>
 
                 {/* BOTTOM ADDRESS CARD */}
@@ -228,7 +285,7 @@ const MapView = ({ reports = [], hotspots = [], onReportClick }) => {
                              {isResolving ? (
                                 <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-blue-600"></div>
                              ) : (
-                                <div className="h-7 w-7 sm:h-8 sm:w-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-bold text-xs">
+                                <div className="h-7 w-7 sm:h-8 sm:w-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-bold text-xs shadow-sm">
                                     ✓
                                 </div>
                              )}

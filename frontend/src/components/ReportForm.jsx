@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { X, Camera, MapPin, Loader, Upload } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { X, Camera, MapPin, Loader, Upload, Search, Navigation } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { API_URL } from '../utils/config';
@@ -14,12 +14,19 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Component to handle map clicks/drags
+// Component to handle map clicks/drags & smooth flyTo
 const LocationMarker = ({ position, setPosition }) => {
-    const map = useMapEvents({
+    const map = useMap();
+
+    useEffect(() => {
+        if (position) {
+            map.flyTo(position, 16, { animate: true, duration: 1 });
+        }
+    }, [position, map]);
+
+    useMapEvents({
         click(e) {
             setPosition(e.latlng);
-            map.flyTo(e.latlng, map.getZoom());
         },
     });
 
@@ -47,13 +54,14 @@ const ReportForm = ({ onClose, onSuccess }) => {
         imageUrlStr: ''
     });
     const [loading, setLoading] = useState(false);
-    const [locationStatus, setLocationStatus] = useState('Detecting location...');
+    const [locationInput, setLocationInput] = useState('');
+    const [searchingLocation, setSearchingLocation] = useState(false);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const videoRef = useRef(null);
     const streamRef = useRef(null);
 
-    // Initial Geolocation
-    useEffect(() => {
+    // Initial Geolocation Detection
+    const detectCurrentLocation = () => {
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -62,20 +70,42 @@ const ReportForm = ({ onClose, onSuccess }) => {
                         latitude: position.coords.latitude,
                         longitude: position.coords.longitude
                     }));
-                    setLocationStatus('Location Detected ✅ (High Accuracy)');
                 },
                 (error) => {
                     console.error("Location error:", error);
-                    setLocationStatus('Location Failed ❌ (Check Permissions)');
                 },
                 { enableHighAccuracy: true }
             );
-        } else {
-            setLocationStatus('Geolocation not supported');
         }
+    };
 
+    useEffect(() => {
+        detectCurrentLocation();
         return () => stopCamera();
     }, []);
+
+    // Search Address to Pin
+    const handleAddressSearch = async (e) => {
+        e.preventDefault();
+        if (!locationInput.trim()) return;
+
+        setSearchingLocation(true);
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationInput)}&limit=1`);
+            const data = await res.json();
+            if (data && data.length > 0) {
+                const lat = parseFloat(data[0].lat);
+                const lon = parseFloat(data[0].lon);
+                setFormData(prev => ({ ...prev, latitude: lat, longitude: lon }));
+            } else {
+                alert("Location not found. Please try a different landmark or street name.");
+            }
+        } catch (err) {
+            console.error("Geocoding failed:", err);
+        } finally {
+            setSearchingLocation(false);
+        }
+    };
 
     const startCamera = async () => {
         setIsCameraOpen(true);
@@ -152,7 +182,6 @@ const ReportForm = ({ onClose, onSuccess }) => {
             };
 
             const response = await axios.post(`${API_URL}/api/reports`, payload);
-            console.log("Success:", response.data);
             onSuccess(response.data);
             onClose();
         } catch (error) {
@@ -186,7 +215,7 @@ const ReportForm = ({ onClose, onSuccess }) => {
                         <input
                             type="text"
                             name="title"
-                            placeholder="e.g. Big Pothole on Main St"
+                            placeholder="e.g. Big Pothole near Main Market"
                             className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition"
                             value={formData.title}
                             onChange={handleChange}
@@ -212,16 +241,47 @@ const ReportForm = ({ onClose, onSuccess }) => {
                         </select>
                     </div>
 
-                    {/* Location (Interactive Map) */}
-                    <div>
-                        <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-1 flex justify-between items-center">
-                            <span>Pin Location (Drag Marker)</span>
-                            <span className="text-[10px] sm:text-xs text-blue-600 font-mono bg-blue-50 px-2 py-0.5 rounded">
+                    {/* Location Options: 3-in-1 Location Picker */}
+                    <div className="space-y-2">
+                        <label className="block text-xs sm:text-sm font-bold text-gray-700 flex justify-between items-center">
+                            <span>Select Location</span>
+                            <span className="text-[10px] text-blue-600 font-mono bg-blue-50 px-2 py-0.5 rounded">
                                 {formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}
                             </span>
                         </label>
 
-                        <div className="h-40 sm:h-48 w-full rounded-xl overflow-hidden border border-gray-300 relative z-0 shadow-inner">
+                        {/* Search Address Box + Detect Button */}
+                        <div className="flex gap-2">
+                            <div className="flex-1 flex bg-slate-50 rounded-xl border border-gray-300 overflow-hidden">
+                                <input
+                                    type="text"
+                                    placeholder="Type street, landmark or area..."
+                                    className="flex-1 px-3 py-2 text-xs outline-none bg-transparent"
+                                    value={locationInput}
+                                    onChange={(e) => setLocationInput(e.target.value)}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleAddressSearch}
+                                    disabled={searchingLocation}
+                                    className="px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center justify-center"
+                                >
+                                    {searchingLocation ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                                </button>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={detectCurrentLocation}
+                                className="bg-slate-100 hover:bg-slate-200 border border-gray-300 text-blue-700 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 transition"
+                                title="Detect Current GPS Location"
+                            >
+                                <Navigation className="w-3.5 h-3.5" /> GPS
+                            </button>
+                        </div>
+
+                        {/* Map View */}
+                        <div className="h-36 sm:h-44 w-full rounded-xl overflow-hidden border border-gray-300 relative z-0 shadow-inner">
                             <MapContainer
                                 center={[formData.latitude, formData.longitude]}
                                 zoom={15}
@@ -264,7 +324,7 @@ const ReportForm = ({ onClose, onSuccess }) => {
                                 </div>
                             </div>
                         ) : formData.imageUrlStr ? (
-                            <div className="relative w-full h-40 bg-gray-100 rounded-xl overflow-hidden border border-gray-200">
+                            <div className="relative w-full h-36 bg-gray-100 rounded-xl overflow-hidden border border-gray-200">
                                 <img
                                     src={formData.imageUrlStr}
                                     alt="Evidence preview"
@@ -283,7 +343,7 @@ const ReportForm = ({ onClose, onSuccess }) => {
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 gap-3">
-                                <label className="flex flex-col items-center justify-center p-3.5 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:bg-blue-50 hover:border-blue-500 transition">
+                                <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:bg-blue-50 hover:border-blue-500 transition">
                                     <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
                                     <Upload className="w-5 h-5 text-blue-600 mb-1" />
                                     <span className="text-xs font-bold text-gray-700">Choose File</span>
@@ -292,7 +352,7 @@ const ReportForm = ({ onClose, onSuccess }) => {
                                 <button
                                     type="button"
                                     onClick={startCamera}
-                                    className="flex flex-col items-center justify-center p-3.5 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:bg-green-50 hover:border-green-500 transition"
+                                    className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:bg-green-50 hover:border-green-500 transition"
                                 >
                                     <Camera className="w-5 h-5 text-green-600 mb-1" />
                                     <span className="text-xs font-bold text-gray-700">Live Camera</span>
@@ -306,9 +366,9 @@ const ReportForm = ({ onClose, onSuccess }) => {
                         <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-1">Description <span className="text-red-500">*</span></label>
                         <textarea
                             name="description"
-                            rows="3"
+                            rows="2"
                             placeholder="Describe the issue..."
-                            className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition resize-none"
+                            className="w-full px-3.5 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition resize-none"
                             value={formData.description}
                             onChange={handleChange}
                             required

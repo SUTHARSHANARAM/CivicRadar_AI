@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { 
     LayoutDashboard, CheckCircle, AlertOctagon, Activity, Map, X, MapPin, 
-    Clock, Tag, FileText, Camera, Upload, Download, Check, Sparkles, Building2, Filter
+    Clock, Tag, FileText, Camera, Upload, Download, Check, Sparkles, Building2, Filter, PieChart, BarChart3
 } from 'lucide-react';
 import { API_URL } from '../utils/config';
 
@@ -391,6 +391,18 @@ const AdminDashboard = () => {
         document.body.removeChild(link);
     };
 
+    // Calculate Analytics Breakdown
+    const totalCount = reports.length || 1;
+    const highCount = reports.filter(r => r.urgency_level === 'High').length;
+    const medCount = reports.filter(r => r.urgency_level === 'Medium').length;
+    const lowCount = reports.filter(r => r.urgency_level === 'Low').length;
+
+    // Dept counts
+    const pwdCount = reports.filter(r => (r.department || '').includes('PWD')).length;
+    const elecCount = reports.filter(r => (r.department || '').includes('Electricity')).length;
+    const saniCount = reports.filter(r => (r.department || '').includes('Sanitation')).length;
+    const waterCount = reports.filter(r => (r.department || '').includes('Water')).length;
+
     return (
         <div className="min-h-screen bg-slate-50 p-3 sm:p-6">
 
@@ -420,9 +432,9 @@ const AdminDashboard = () => {
                     <Link to="/" className="text-xs sm:text-sm text-blue-600 hover:underline mb-1 inline-block font-semibold">← Back to Map</Link>
                     <h1 className="text-xl sm:text-3xl font-bold text-slate-800 flex items-center gap-2">
                         <LayoutDashboard className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
-                        Admin Dashboard
+                        Admin Dashboard & Analytics
                     </h1>
-                    <p className="text-xs sm:text-sm text-slate-500">Automated Department Routing & Resolution Proof</p>
+                    <p className="text-xs sm:text-sm text-slate-500">Automated Department Routing & Performance Insights</p>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
                     <button
@@ -455,6 +467,73 @@ const AdminDashboard = () => {
                         </div>
                     </div>
                 ))}
+            </div>
+
+            {/* VISUAL ANALYTICS SECTION */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {/* Priority Breakdown Bar */}
+                <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <div className="flex justify-between items-center mb-3">
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                            <PieChart className="w-4 h-4 text-purple-600" /> Urgency Level Distribution
+                        </h4>
+                        <span className="text-[10px] text-gray-400 font-mono">Live AI Ratio</span>
+                    </div>
+
+                    <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex mb-3">
+                        <div style={{ width: `${(highCount / totalCount) * 100}%` }} className="bg-red-500 transition-all duration-500" title="High" />
+                        <div style={{ width: `${(medCount / totalCount) * 100}%` }} className="bg-orange-400 transition-all duration-500" title="Medium" />
+                        <div style={{ width: `${(lowCount / totalCount) * 100}%` }} className="bg-blue-500 transition-all duration-500" title="Low" />
+                    </div>
+
+                    <div className="flex justify-between text-xs font-semibold text-gray-600">
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" /> High: {highCount}</span>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-400 inline-block" /> Medium: {medCount}</span>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" /> Low: {lowCount}</span>
+                    </div>
+                </div>
+
+                {/* Department Load Progress Bars */}
+                <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <div className="flex justify-between items-center mb-3">
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                            <BarChart3 className="w-4 h-4 text-blue-600" /> Department Volume Overview
+                        </h4>
+                        <span className="text-[10px] text-gray-400 font-mono">Active Load</span>
+                    </div>
+
+                    <div className="space-y-2 text-xs font-semibold">
+                        <div>
+                            <div className="flex justify-between mb-0.5 text-gray-600">
+                                <span>PWD / Roads</span>
+                                <span>{pwdCount}</span>
+                            </div>
+                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div style={{ width: `${Math.min((pwdCount / totalCount) * 100, 100)}%` }} className="bg-blue-600 h-full rounded-full" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="flex justify-between mb-0.5 text-gray-600">
+                                <span>Electricity Board</span>
+                                <span>{elecCount}</span>
+                            </div>
+                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div style={{ width: `${Math.min((elecCount / totalCount) * 100, 100)}%` }} className="bg-amber-500 h-full rounded-full" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="flex justify-between mb-0.5 text-gray-600">
+                                <span>Sanitation & Waste</span>
+                                <span>{saniCount}</span>
+                            </div>
+                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div style={{ width: `${Math.min((saniCount / totalCount) * 100, 100)}%` }} className="bg-emerald-500 h-full rounded-full" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Department Filter Bar */}
