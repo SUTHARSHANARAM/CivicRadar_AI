@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+pydantic-settings
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+shapely
+geoalchemy2
+requests
+scikit-learn
+joblib
+pandas
+numpy
